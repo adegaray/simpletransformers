@@ -893,7 +893,6 @@ def write_predictions_extended(
 
     return all_predictions, all_nbest_json, scores_diff_json
 
-
 def get_best_predictions(
     all_examples,
     all_features,
@@ -985,7 +984,7 @@ def get_best_predictions(
         prelim_predictions = sorted(prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True,)
 
         _NbestPrediction = collections.namedtuple(  # pylint: disable=invalid-name
-            "NbestPrediction", ["text", "start_logit", "end_logit"]
+            "NbestPrediction", ["text", "start_logit", "end_logit","start_index"]
         )
 
         seen_predictions = {}
@@ -993,8 +992,8 @@ def get_best_predictions(
         for pred in prelim_predictions:
             if len(nbest) >= n_best_size:
                 break
+            feature = features[pred.feature_index]
             if pred.start_index > 0:  # this is a non-null prediction
-                feature = features[pred.feature_index]
                 tok_tokens = feature.tokens[pred.start_index : (pred.end_index + 1)]
                 orig_doc_start = feature.token_to_orig_map[pred.start_index]
                 orig_doc_end = feature.token_to_orig_map[pred.end_index]
@@ -1019,7 +1018,7 @@ def get_best_predictions(
                 final_text = ""
                 seen_predictions[final_text] = True
 
-            nbest.append(_NbestPrediction(text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit,))
+            nbest.append(_NbestPrediction(text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit,start_index=start_index))
         # if we didn't include the empty option in the n-best, include it
         if version_2_with_negative:
             if "" not in seen_predictions:
@@ -1054,6 +1053,7 @@ def get_best_predictions(
             output["probability"] = probs[i]
             output["start_logit"] = entry.start_logit
             output["end_logit"] = entry.end_logit
+            output["start_index"] = entry.start_index
             nbest_json.append(output)
 
         assert len(nbest_json) >= 1
@@ -1069,8 +1069,9 @@ def get_best_predictions(
             else:
                 all_predictions[example.qas_id] = best_non_null_entry.text
         all_nbest_json[example.qas_id] = nbest_json
+        print(all_nbest_json)
 
-    all_best = [{"id": id, "answer": answers[0]["text"]} for id, answers in all_nbest_json.items()]
+    all_best = [{"id": id, "answer": answers[0]["text"], "start_index":answers[0]["start_index"]} for id, answers, start_index in all_nbest_json.items()]
     return all_best
 
 
